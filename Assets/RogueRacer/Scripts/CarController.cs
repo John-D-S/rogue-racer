@@ -18,12 +18,14 @@ public class CarController : MonoBehaviour
     public float brakePower;
     public float visualMaxSteeringAngle = 45;
     public AnimationCurve steeringCurve;
+    public float normalWheelFriction;
+    public float driftWheelFriction;
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
     public AnimationCurve torqueCurve;
 
     [Tooltip("basically accelleration")]
     public float maxTorque;
-    [Tooltip("The speed at which torque becomes 0")]
+    [Tooltip("The speed at which torque becomes 0 in m/s")]
     public float maxSpeed;
     
     [Header("=== For Debugging ===")]
@@ -31,6 +33,8 @@ public class CarController : MonoBehaviour
     public float gasInput;
     public float brakeInput;
     public float steeringInput;
+    private bool boostInput;
+    private bool driftInput;
     private float steeringAngle;
     
     private float speed;
@@ -61,9 +65,10 @@ public class CarController : MonoBehaviour
     {
         speed = playerRB.velocity.magnitude;
         CheckInput();
+        ApplyDrift();
         ApplyMotor();
         ApplySteering();
-        //ApplyBrake();
+        ApplyBrake();
         if(wheelParticles.ParticlesExist)
         {
             CheckParticles();
@@ -78,6 +83,8 @@ public class CarController : MonoBehaviour
         steeringInput = Input.GetAxis("Horizontal");
         slipAngle = Vector3.Angle(transform.forward, playerRB.velocity-transform.forward);
 
+        driftInput = Input.GetButton("Drift");
+
         //fixed code to brake even after going on reverse by Andrew Alex 
         float movingDirection = Vector3.Dot(transform.forward, playerRB.velocity);
         if (movingDirection < -0.5f && gasInput > 0)
@@ -87,6 +94,10 @@ public class CarController : MonoBehaviour
         else if (movingDirection > 0.5f && gasInput < 0)
         {
             brakeInput = Mathf.Abs(gasInput);
+        }
+        else if (Mathf.Abs(speed) < 1 && Mathf.Abs(gasInput) < 0.25f)
+        {
+            brakeInput = 1;
         }
         else
         {
@@ -102,11 +113,33 @@ public class CarController : MonoBehaviour
         colliders.RRWheel.brakeTorque = brakeInput * brakePower * 0.3f;
         colliders.RLWheel.brakeTorque = brakeInput * brakePower *0.3f;
     }
+
+    void ApplyDrift()
+    {
+        var rrFriction = colliders.RRWheel.sidewaysFriction;
+        var rlFriction = colliders.RLWheel.sidewaysFriction;
+        if(driftInput)
+        {
+            rrFriction.stiffness = driftWheelFriction;
+            rlFriction.stiffness = driftWheelFriction;
+            colliders.RRWheel.sidewaysFriction = rrFriction;
+            colliders.RLWheel.sidewaysFriction = rlFriction;
+        }
+        else
+        {
+            rrFriction.stiffness = normalWheelFriction;
+            rlFriction.stiffness = normalWheelFriction;
+            colliders.RRWheel.sidewaysFriction = rrFriction;
+            colliders.RLWheel.sidewaysFriction = rlFriction;
+        }
+    }
     
     void ApplyMotor() 
     {
-        colliders.RRWheel.motorTorque = motorPower * gasInput;
-        colliders.RLWheel.motorTorque = motorPower * gasInput;
+        colliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        colliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        //Debug.Log(speed);
+        Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
     }
     
     void ApplySteering()
@@ -176,9 +209,10 @@ public class CarController : MonoBehaviour
         Quaternion quat;
         Vector3 position;
         _wheelCollider.GetWorldPose(out position, out quat);
-        Vector3 visualWheelRot = new Vector3(0, _steeringAngle, 0);
+        //Vector3 visualWheelRot = new Vector3(0, _steeringAngle, 0);
+        //_visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRot);
         _visualWheelTransform.position = position;
-        _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRot);
+        _visualWheelTransform.rotation = quat;
     }
 
     public void OnDrawGizmos()
