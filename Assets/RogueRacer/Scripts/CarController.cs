@@ -14,10 +14,10 @@ public class CarController : MonoBehaviour
     public VisualWheels visualWheels;
     public WheelParticles wheelParticles;
     public GameObject smokePrefab;
-    public float motorPower;
     public float brakePower;
     public float visualMaxSteeringAngle = 45;
     public AnimationCurve steeringCurve;
+    public float steerLerpSpeed;
     public float normalWheelFriction;
     public float driftWheelFriction;
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
@@ -35,7 +35,10 @@ public class CarController : MonoBehaviour
     public float steeringInput;
     private bool boostInput;
     private bool driftInput;
+    private float targetSteeringAngle;
     private float steeringAngle;
+
+    private Dictionary<WheelCollider, float> visualWheelRotations = new Dictionary<WheelCollider, float>();
     
     private float speed;
     
@@ -120,6 +123,10 @@ public class CarController : MonoBehaviour
         var rlFriction = colliders.RLWheel.sidewaysFriction;
         if(driftInput)
         {
+            /*
+            rrFriction.stiffness = driftWheelFriction;
+            rlFriction.stiffness = driftWheelFriction;
+            */
             rrFriction.stiffness = driftWheelFriction;
             rlFriction.stiffness = driftWheelFriction;
             colliders.RRWheel.sidewaysFriction = rrFriction;
@@ -139,24 +146,25 @@ public class CarController : MonoBehaviour
         colliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
         colliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
         //Debug.Log(speed);
-        Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
+        //Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
     }
     
     void ApplySteering()
     {
-        steeringAngle = steeringInput * steeringCurve.Evaluate(speed);
+        targetSteeringAngle = steeringInput * steeringCurve.Evaluate(speed);
         if (slipAngle < 120f)
         {
-            steeringAngle += Vector3.SignedAngle(transform.forward, playerRB.velocity + transform.forward, Vector3.up);
+            targetSteeringAngle += Vector3.SignedAngle(transform.forward, playerRB.velocity + transform.forward, Vector3.up);
         }
-        steeringAngle = Mathf.Clamp(steeringAngle, -90f, 90f);
+        targetSteeringAngle = Mathf.Clamp(targetSteeringAngle, -90f, 90f);
+        steeringAngle = Mathf.Lerp(steeringAngle, targetSteeringAngle, Time.deltaTime * steerLerpSpeed);
         colliders.FRWheel.steerAngle = steeringAngle;
         colliders.FLWheel.steerAngle = steeringAngle;
     }
 
     void ApplyWheelPositions()
     {
-        float visualSteeringAngle = Mathf.Clamp(steeringAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
+        float visualSteeringAngle = Mathf.Clamp(targetSteeringAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
         UpdateWheel(colliders.FRWheel, visualWheels.FRWheel, visualSteeringAngle);
         UpdateWheel(colliders.FLWheel, visualWheels.FLWheel, visualSteeringAngle);
         UpdateWheel(colliders.RRWheel, visualWheels.RRWheel, 0);
@@ -200,8 +208,6 @@ public class CarController : MonoBehaviour
         {
             wheelParticles.RLWheel.Stop();
         }
-
-
     }
     
     void UpdateWheel(WheelCollider _wheelCollider, Transform _visualWheelTransform, float _steeringAngle)
@@ -212,7 +218,11 @@ public class CarController : MonoBehaviour
         //Vector3 visualWheelRot = new Vector3(0, _steeringAngle, 0);
         //_visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRot);
         _visualWheelTransform.position = position;
-        _visualWheelTransform.rotation = quat;
+        float angle = _wheelCollider.steerAngle;
+        if(!visualWheelRotations.ContainsKey(_wheelCollider))
+            visualWheelRotations[_wheelCollider] = 0;
+        visualWheelRotations[_wheelCollider] = (visualWheelRotations[_wheelCollider] + _wheelCollider.rpm * 0.016666f * 360 * Time.deltaTime) % 360;
+        _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], angle, 0);
     }
 
     public void OnDrawGizmos()
