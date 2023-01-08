@@ -6,6 +6,8 @@ using Unity.Mathematics;
 
 using UnityEngine;
 
+using Debug = System.Diagnostics.Debug;
+
 public class CarController : MonoBehaviour
 {
     private Rigidbody playerRB;
@@ -14,15 +16,30 @@ public class CarController : MonoBehaviour
     public VisualWheels visualWheels;
     public WheelParticles wheelParticles;
     public GameObject smokePrefab;
-    public float brakePower;
     public float visualMaxSteeringAngle = 45;
     public AnimationCurve steeringCurve;
     public float steerLerpSpeed;
     public float normalWheelFriction;
+    [Range(0, 180)]
+    public float maxDriftAngleStart = 80;
+    [Range(0, 180)]
+    public float maxDriftAngleStop = 125;
+    public float counterDriftStartSpeed = 5;
+    public float counterDriftStopSpeed = 10;
+    public float maxCounterDriftAngularAccel = 50;
     public float driftWheelFriction;
+    [Header("=== Boost ===")]
+    public float boostForce = 10;
+    [Tooltip("boost is in seconds")]
+    public float maxBoost = 3f;
+    public float boostRechargeRate = 0.5f;
+    public float boostRechargeDelay = 2f;
+
+    private bool FullyGrounded => colliders.FLWheel.isGrounded && colliders.FRWheel.isGrounded && colliders.RLWheel.isGrounded && colliders.RRWheel.isGrounded;
+    
+    public float brakePower;
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
     public AnimationCurve torqueCurve;
-
     [Tooltip("basically accelleration")]
     public float maxTorque;
     [Tooltip("The speed at which torque becomes 0 in m/s")]
@@ -33,6 +50,8 @@ public class CarController : MonoBehaviour
     public float gasInput;
     public float brakeInput;
     public float steeringInput;
+    public float remainingBoost;
+    
     private bool boostInput;
     private bool driftInput;
     private float targetSteeringAngle;
@@ -41,6 +60,9 @@ public class CarController : MonoBehaviour
     private Dictionary<WheelCollider, float> visualWheelRotations = new Dictionary<WheelCollider, float>();
     
     private float speed;
+
+    public float MetPerSecToKilPerHour(float input) => input * 3.6f;
+    public float KilPerHourToMetPerSec(float input) => input / 3.6f;
     
     // Start is called before the first frame update
     void Start()
@@ -79,6 +101,22 @@ public class CarController : MonoBehaviour
         ApplyWheelPositions();
     }
 
+    
+    private void FixedUpdate()
+    {
+        //ApplyBoost();
+        float counterDriftTorque = 0;
+        if(slipAngle > maxDriftAngleStart && driftInput && FullyGrounded && speed > counterDriftStartSpeed)
+        {
+            float speedModifier = Mathf.Lerp(0, 1, speed - counterDriftStartSpeed / counterDriftStopSpeed - counterDriftStartSpeed);
+            counterDriftTorque = Mathf.Lerp(0, maxCounterDriftAngularAccel, (slipAngle - maxDriftAngleStart) / (maxDriftAngleStop - maxDriftAngleStart)) * speedModifier;
+            float direction = Vector3.Dot(transform.right, playerRB.velocity) > 1
+                ? 1
+                : -1;
+            playerRB.AddTorque(transform.up * (counterDriftTorque * direction), ForceMode.Acceleration);
+        }
+    }
+    
     void CheckInput()
     {
         gasInput = Input.GetAxisRaw("Vertical");
@@ -87,8 +125,9 @@ public class CarController : MonoBehaviour
         slipAngle = Vector3.Angle(transform.forward, playerRB.velocity-transform.forward);
 
         driftInput = Input.GetButton("Drift");
+        boostInput = Input.GetButton("Boost");
 
-        //fixed code to brake even after going on reverse by Andrew Alex 
+        //fixed code to brake even after going on reverse 
         float movingDirection = Vector3.Dot(transform.forward, playerRB.velocity);
         if (movingDirection < -0.5f && gasInput > 0)
         {
@@ -114,7 +153,7 @@ public class CarController : MonoBehaviour
         colliders.FLWheel.brakeTorque = brakeInput * brakePower * 0.7f;
 
         colliders.RRWheel.brakeTorque = brakeInput * brakePower * 0.3f;
-        colliders.RLWheel.brakeTorque = brakeInput * brakePower *0.3f;
+        colliders.RLWheel.brakeTorque = brakeInput * brakePower * 0.3f;
     }
 
     void ApplyDrift()
@@ -123,6 +162,7 @@ public class CarController : MonoBehaviour
         var rlFriction = colliders.RLWheel.sidewaysFriction;
         if(driftInput)
         {
+            
             /*
             rrFriction.stiffness = driftWheelFriction;
             rlFriction.stiffness = driftWheelFriction;
@@ -140,7 +180,15 @@ public class CarController : MonoBehaviour
             colliders.RLWheel.sidewaysFriction = rlFriction;
         }
     }
-    
+    /*
+    void ApplyBoost()
+    {
+        if(boostInput && )
+        {
+            playerRB.AddForce(transform.forward * boostForce, ForceMode.Force);
+        }
+    }
+  */  
     void ApplyMotor() 
     {
         colliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
@@ -154,7 +202,7 @@ public class CarController : MonoBehaviour
         targetSteeringAngle = steeringInput * steeringCurve.Evaluate(speed);
         if (slipAngle < 120f)
         {
-            targetSteeringAngle += Vector3.SignedAngle(transform.forward, playerRB.velocity + transform.forward, Vector3.up);
+            targetSteeringAngle += Vector3.SignedAngle(transform.forward, playerRB.velocity + transform.forward, transform.up);
         }
         targetSteeringAngle = Mathf.Clamp(targetSteeringAngle, -90f, 90f);
         steeringAngle = Mathf.Lerp(steeringAngle, targetSteeringAngle, Time.deltaTime * steerLerpSpeed);
