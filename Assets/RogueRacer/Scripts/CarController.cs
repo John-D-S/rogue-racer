@@ -4,6 +4,8 @@ using System.Collections.Generic;
 
 using Unity.Mathematics;
 
+using UnityEditor.Rendering;
+
 using UnityEngine;
 
 using Debug = System.Diagnostics.Debug;
@@ -12,12 +14,12 @@ public class CarController : MonoBehaviour
 {
     private Rigidbody playerRB;
     public Vector3 centerOfMass;
-    public WheelColliders colliders;
+    public WheelColliders wheelColliders;
     public VisualWheels visualWheels;
     public WheelParticles wheelParticles;
     public GameObject smokePrefab;
     public float visualMaxSteeringAngle = 45;
-    public AnimationCurve steeringCurve;
+    public AnimationCurve steeringCurve = new AnimationCurve(new Keyframe(0, 30, 0, 0), new Keyframe(60, 10));
     public float steerLerpSpeed;
     public float normalWheelFriction;
     [Range(0, 180)]
@@ -35,13 +37,15 @@ public class CarController : MonoBehaviour
     public float boostRechargeRate = 0.5f;
     public float boostRechargeDelay = 2f;
 
-    private bool FullyGrounded => colliders.FLWheel.isGrounded && colliders.FRWheel.isGrounded && colliders.RLWheel.isGrounded && colliders.RRWheel.isGrounded;
+    private bool FullyGrounded => wheelColliders.FLWheel.isGrounded && wheelColliders.FRWheel.isGrounded && wheelColliders.RLWheel.isGrounded && wheelColliders.RRWheel.isGrounded;
     
     public float brakePower;
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
     public AnimationCurve torqueCurve;
     [Tooltip("basically accelleration")]
     public float maxTorque;
+    public float initialAccelleration = 5;
+    public float initialAccellerationMaxSpeed = 5;
     [Tooltip("The speed at which torque becomes 0 in m/s")]
     public float maxSpeed;
     
@@ -75,13 +79,13 @@ public class CarController : MonoBehaviour
 
     void InstantiateSmoke()
     {
-        wheelParticles.FRWheel = Instantiate(smokePrefab, colliders.FRWheel.transform.position - Vector3.up * colliders.FRWheel.radius, Quaternion.identity, colliders.FRWheel.transform)
+        wheelParticles.FRWheel = Instantiate(smokePrefab, wheelColliders.FRWheel.transform.position - Vector3.up * wheelColliders.FRWheel.radius, Quaternion.identity, wheelColliders.FRWheel.transform)
             .GetComponent<ParticleSystem>();
-        wheelParticles.FLWheel = Instantiate(smokePrefab, colliders.FLWheel.transform.position - Vector3.up * colliders.FRWheel.radius, Quaternion.identity, colliders.FLWheel.transform)
+        wheelParticles.FLWheel = Instantiate(smokePrefab, wheelColliders.FLWheel.transform.position - Vector3.up * wheelColliders.FRWheel.radius, Quaternion.identity, wheelColliders.FLWheel.transform)
             .GetComponent<ParticleSystem>();
-        wheelParticles.RRWheel = Instantiate(smokePrefab, colliders.RRWheel.transform.position - Vector3.up * colliders.FRWheel.radius, Quaternion.identity, colliders.RRWheel.transform)
+        wheelParticles.RRWheel = Instantiate(smokePrefab, wheelColliders.RRWheel.transform.position - Vector3.up * wheelColliders.FRWheel.radius, Quaternion.identity, wheelColliders.RRWheel.transform)
             .GetComponent<ParticleSystem>();
-        wheelParticles.RLWheel = Instantiate(smokePrefab, colliders.RLWheel.transform.position - Vector3.up * colliders.FRWheel.radius, Quaternion.identity, colliders.RLWheel.transform)
+        wheelParticles.RLWheel = Instantiate(smokePrefab, wheelColliders.RLWheel.transform.position - Vector3.up * wheelColliders.FRWheel.radius, Quaternion.identity, wheelColliders.RLWheel.transform)
             .GetComponent<ParticleSystem>();
     }
 
@@ -91,7 +95,6 @@ public class CarController : MonoBehaviour
         speed = playerRB.velocity.magnitude;
         CheckInput();
         ApplyDrift();
-        ApplyMotor();
         ApplySteering();
         ApplyBrake();
         if(wheelParticles.ParticlesExist)
@@ -104,12 +107,14 @@ public class CarController : MonoBehaviour
     
     private void FixedUpdate()
     {
+        ApplyMotor();
+        
         //ApplyBoost();
         float counterDriftTorque = 0;
         if(slipAngle > maxDriftAngleStart && driftInput && FullyGrounded && speed > counterDriftStartSpeed)
         {
             float speedModifier = Mathf.Lerp(0, 1, speed - counterDriftStartSpeed / counterDriftStopSpeed - counterDriftStartSpeed);
-            counterDriftTorque = Mathf.Lerp(0, maxCounterDriftAngularAccel, (slipAngle - maxDriftAngleStart) / (maxDriftAngleStop - maxDriftAngleStart)) * speedModifier;
+            counterDriftTorque = Mathf.Pow(Mathf.Lerp(0, 1, (slipAngle - maxDriftAngleStart) / (maxDriftAngleStop - maxDriftAngleStart)), 2) * maxCounterDriftAngularAccel * speedModifier;
             float direction = Vector3.Dot(transform.right, playerRB.velocity) > 1
                 ? 1
                 : -1;
@@ -149,17 +154,17 @@ public class CarController : MonoBehaviour
     
     void ApplyBrake()
     {
-        colliders.FRWheel.brakeTorque = brakeInput * brakePower* 0.7f ;
-        colliders.FLWheel.brakeTorque = brakeInput * brakePower * 0.7f;
+        wheelColliders.FRWheel.brakeTorque = brakeInput * brakePower* 0.7f ;
+        wheelColliders.FLWheel.brakeTorque = brakeInput * brakePower * 0.7f;
 
-        colliders.RRWheel.brakeTorque = brakeInput * brakePower * 0.3f;
-        colliders.RLWheel.brakeTorque = brakeInput * brakePower * 0.3f;
+        wheelColliders.RRWheel.brakeTorque = brakeInput * brakePower * 0.3f;
+        wheelColliders.RLWheel.brakeTorque = brakeInput * brakePower * 0.3f;
     }
 
     void ApplyDrift()
     {
-        var rrFriction = colliders.RRWheel.sidewaysFriction;
-        var rlFriction = colliders.RLWheel.sidewaysFriction;
+        var rrFriction = wheelColliders.RRWheel.sidewaysFriction;
+        var rlFriction = wheelColliders.RLWheel.sidewaysFriction;
         if(driftInput)
         {
             
@@ -169,15 +174,15 @@ public class CarController : MonoBehaviour
             */
             rrFriction.stiffness = driftWheelFriction;
             rlFriction.stiffness = driftWheelFriction;
-            colliders.RRWheel.sidewaysFriction = rrFriction;
-            colliders.RLWheel.sidewaysFriction = rlFriction;
+            wheelColliders.RRWheel.sidewaysFriction = rrFriction;
+            wheelColliders.RLWheel.sidewaysFriction = rlFriction;
         }
         else
         {
             rrFriction.stiffness = normalWheelFriction;
             rlFriction.stiffness = normalWheelFriction;
-            colliders.RRWheel.sidewaysFriction = rrFriction;
-            colliders.RLWheel.sidewaysFriction = rlFriction;
+            wheelColliders.RRWheel.sidewaysFriction = rrFriction;
+            wheelColliders.RLWheel.sidewaysFriction = rlFriction;
         }
     }
     /*
@@ -191,8 +196,18 @@ public class CarController : MonoBehaviour
   */  
     void ApplyMotor() 
     {
-        colliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
-        colliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        wheelColliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        wheelColliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        
+        //this code will add
+        if(FullyGrounded && speed < initialAccellerationMaxSpeed)
+        {
+            Vector3 forcePosL = wheelColliders.RLWheel.transform.position - wheelColliders.RLWheel.transform.up * wheelColliders.RLWheel.forceAppPointDistance;
+            Vector3 forcePosR = wheelColliders.RRWheel.transform.position - wheelColliders.RRWheel.transform.up * wheelColliders.RRWheel.forceAppPointDistance;
+            float forceAmount = Mathf.Lerp(initialAccelleration, 0, Mathf.InverseLerp(0, initialAccellerationMaxSpeed, speed)) * gasInput * 0.5f;
+            playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosL, ForceMode.Acceleration);
+            playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosR, ForceMode.Acceleration);
+        }
         //Debug.Log(speed);
         //Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
     }
@@ -206,26 +221,26 @@ public class CarController : MonoBehaviour
         }
         targetSteeringAngle = Mathf.Clamp(targetSteeringAngle, -90f, 90f);
         steeringAngle = Mathf.Lerp(steeringAngle, targetSteeringAngle, Time.deltaTime * steerLerpSpeed);
-        colliders.FRWheel.steerAngle = steeringAngle;
-        colliders.FLWheel.steerAngle = steeringAngle;
+        wheelColliders.FRWheel.steerAngle = steeringAngle;
+        wheelColliders.FLWheel.steerAngle = steeringAngle;
     }
 
     void ApplyWheelPositions()
     {
         float visualSteeringAngle = Mathf.Clamp(targetSteeringAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
-        UpdateWheel(colliders.FRWheel, visualWheels.FRWheel, visualSteeringAngle);
-        UpdateWheel(colliders.FLWheel, visualWheels.FLWheel, visualSteeringAngle);
-        UpdateWheel(colliders.RRWheel, visualWheels.RRWheel, 0);
-        UpdateWheel(colliders.RLWheel, visualWheels.RLWheel, 0);
+        UpdateWheel(wheelColliders.FRWheel, visualWheels.FRWheel, visualSteeringAngle);
+        UpdateWheel(wheelColliders.FLWheel, visualWheels.FLWheel, visualSteeringAngle);
+        UpdateWheel(wheelColliders.RRWheel, visualWheels.RRWheel, 0);
+        UpdateWheel(wheelColliders.RLWheel, visualWheels.RLWheel, 0);
     }
     
     void CheckParticles() {
         WheelHit[] wheelHits = new WheelHit[4];
-        colliders.FRWheel.GetGroundHit(out wheelHits[0]);
-        colliders.FLWheel.GetGroundHit(out wheelHits[1]);
+        wheelColliders.FRWheel.GetGroundHit(out wheelHits[0]);
+        wheelColliders.FLWheel.GetGroundHit(out wheelHits[1]);
 
-        colliders.RRWheel.GetGroundHit(out wheelHits[2]);
-        colliders.RLWheel.GetGroundHit(out wheelHits[3]);
+        wheelColliders.RRWheel.GetGroundHit(out wheelHits[2]);
+        wheelColliders.RLWheel.GetGroundHit(out wheelHits[3]);
 
         float slipAllowance = 0.5f;
         if ((Mathf.Abs(wheelHits[0].sidewaysSlip) + Mathf.Abs(wheelHits[0].forwardSlip) > slipAllowance)){
@@ -278,6 +293,7 @@ public class CarController : MonoBehaviour
         Gizmos.DrawSphere(transform.position + transform.rotation * centerOfMass, 0.25f);
     }
 }
+
 [System.Serializable]
 public class WheelColliders
 {
