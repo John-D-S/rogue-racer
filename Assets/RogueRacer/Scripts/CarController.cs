@@ -203,15 +203,23 @@ public class CarController : MonoBehaviour
         wheelColliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
         wheelColliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
         
-        //this code will add
-        if(FullyGrounded && speed < initialAccellerationMaxSpeed)
+        //this code will add an additinal accelleration to get the car started moving
+        float forceAmount = Mathf.Lerp(initialAccelleration, 0, Mathf.InverseLerp(0, initialAccellerationMaxSpeed, speed)) * gasInput * 0.5f;
+        if(speed < initialAccellerationMaxSpeed)
         {
-            Vector3 forcePosL = wheelColliders.RLWheel.transform.position - wheelColliders.RLWheel.transform.up * wheelColliders.RLWheel.forceAppPointDistance;
-            Vector3 forcePosR = wheelColliders.RRWheel.transform.position - wheelColliders.RRWheel.transform.up * wheelColliders.RRWheel.forceAppPointDistance;
-            float forceAmount = Mathf.Lerp(initialAccelleration, 0, Mathf.InverseLerp(0, initialAccellerationMaxSpeed, speed)) * gasInput * 0.5f;
-            playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosL, ForceMode.Acceleration);
-            playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosR, ForceMode.Acceleration);
+            if(wheelColliders.RRWheel.isGrounded)
+            {
+                Vector3 forcePosR = wheelColliders.RRWheel.transform.position - wheelColliders.RRWheel.transform.up * wheelColliders.RRWheel.forceAppPointDistance;
+                playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosR, ForceMode.Acceleration);
+            }
+
+            if(wheelColliders.RLWheel.isGrounded)
+            {
+                Vector3 forcePosL = wheelColliders.RLWheel.transform.position - wheelColliders.RLWheel.transform.up * wheelColliders.RLWheel.forceAppPointDistance;
+                playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosL, ForceMode.Acceleration);
+            }
         }
+        
         //Debug.Log(speed);
         //Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
     }
@@ -285,7 +293,7 @@ public class CarController : MonoBehaviour
         //Vector3 visualWheelRot = new Vector3(0, _steeringAngle, 0);
         //_visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRot);
         _visualWheelTransform.position = position;
-        float angle = _wheelCollider.steerAngle;
+        float angle = Mathf.Clamp(_wheelCollider.steerAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
         if(!visualWheelRotations.ContainsKey(_wheelCollider))
             visualWheelRotations[_wheelCollider] = 0;
         visualWheelRotations[_wheelCollider] = (visualWheelRotations[_wheelCollider] + _wheelCollider.rpm * 0.016666f * 360 * Time.deltaTime) % 360;
