@@ -111,13 +111,17 @@ public class CarController : MonoBehaviour
         
         //ApplyBoost();
         float counterDriftTorque = 0;
-        if(slipAngle > maxDriftAngleStart && driftInput && FullyGrounded && speed > counterDriftStartSpeed)
+        if(slipAngle > maxDriftAngleStart && driftInput && gasInput != 0 && FullyGrounded && speed > counterDriftStartSpeed)
         {
             float speedModifier = Mathf.Lerp(0, 1, speed - counterDriftStartSpeed / counterDriftStopSpeed - counterDriftStartSpeed);
             counterDriftTorque = Mathf.Pow(Mathf.Lerp(0, 1, (slipAngle - maxDriftAngleStart) / (maxDriftAngleStop - maxDriftAngleStart)), 2) * maxCounterDriftAngularAccel * speedModifier;
-            float direction = Vector3.Dot(transform.right, playerRB.velocity) > 1
+            int direction = Vector3.Dot(transform.right, playerRB.velocity) > 1
                 ? 1
                 : -1;
+            if(Mathf.RoundToInt(Mathf.Sign(playerRB.angularVelocity.y)) == direction && Mathf.Sign(Mathf.RoundToInt(Vector3.Dot(playerRB.velocity, transform.forward))) != -1)
+            {
+                direction = 0;
+            }
             playerRB.AddTorque(transform.up * (counterDriftTorque * direction), ForceMode.Acceleration);
         }
     }
