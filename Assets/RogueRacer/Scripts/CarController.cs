@@ -2,64 +2,121 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-using Unity.Mathematics;
-
-using UnityEditor.Rendering;
-
 using UnityEngine;
 
-using Debug = System.Diagnostics.Debug;
+[System.Serializable]
+public class WheelColliders
+{
+    public WheelCollider FLWheel;
+    public WheelCollider FRWheel;
+    public WheelCollider RLWheel;
+    public WheelCollider RRWheel;
+}
+[System.Serializable]
+public class VisualWheels
+{
+    public Transform FLWheel;
+    public Transform FRWheel;
+    public Transform RLWheel;
+    public Transform RRWheel;
+}
+[System.Serializable]
+public class WheelParticles
+{
+    public ParticleSystem FLWheel;
+    public ParticleSystem FRWheel;
+    public ParticleSystem RLWheel;
+    public ParticleSystem RRWheel;
+
+    public bool ParticlesExist => (FLWheel != null) && (FRWheel != null) && (RLWheel != null) && (RRWheel != null);
+}
+[System.Serializable]
+public class WheelSettings
+{
+    public float mass;
+    public float radius;
+    public float wheelDampingRate;
+    public float suspensionDistance;
+    public float forceAppPointDistance;
+    public Vector3 center;
+    public JointSpring suspensionSpring;
+    public WheelFrictionCurve forwardFriction;
+    public WheelFrictionCurve sidewaysFriction;
+
+    public void SetWheelColliderSettings(ref WheelCollider _wheel)
+    {
+        _wheel.mass = mass;
+        _wheel.radius = radius;
+        _wheel.wheelDampingRate = wheelDampingRate;
+        _wheel.suspensionDistance = suspensionDistance;
+        _wheel.forceAppPointDistance = forceAppPointDistance;
+        _wheel.center = center;
+        _wheel.suspensionSpring = suspensionSpring;
+        _wheel.forwardFriction = forwardFriction;
+        _wheel.sidewaysFriction = sidewaysFriction;
+    }
+}
+
+public struct CarInput
+{
+    public float gasInput;
+    public float steeringInput;
+    public bool boostInput;
+    public bool driftInput;
+}
 
 public class CarController : MonoBehaviour
 {
-    private Rigidbody playerRB;
-    public Vector3 centerOfMass;
-    public WheelColliders wheelColliders;
-    public VisualWheels visualWheels;
-    public WheelParticles wheelParticles;
-    public GameObject smokePrefab;
-    public float visualMaxSteeringAngle = 45;
-    public AnimationCurve steeringCurve = new AnimationCurve(new Keyframe(0, 30, 0, 0), new Keyframe(60, 10));
-    public float steerLerpSpeed;
-    public float normalWheelFriction;
+    private Rigidbody playerRB; 
+    [SerializeField] private Vector3 centerOfMass;
+    [SerializeField] private WheelColliders wheelColliders;
+    [SerializeField] private VisualWheels visualWheels;
+    [SerializeField] private WheelParticles wheelParticles;
+    [SerializeField] private GameObject smokePrefab;
+    [SerializeField] private float visualMaxSteeringAngle = 45;
+    [SerializeField] private AnimationCurve steeringCurve = new AnimationCurve(new Keyframe(0, 30, 0, 0), new Keyframe(60, 10));
+    [SerializeField] private float steerLerpSpeed;
+    [SerializeField] private float normalWheelFriction;
     [Range(0, 180)]
-    public float maxDriftAngleStart = 80;
+    [SerializeField] private float maxDriftAngleStart = 80;
     [Range(0, 180)]
-    public float maxDriftAngleStop = 125;
-    public float counterDriftStartSpeed = 5;
-    public float counterDriftStopSpeed = 10;
-    public float maxCounterDriftAngularAccel = 50;
-    public float driftWheelFriction;
+    [SerializeField] private float maxDriftAngleStop = 125;
+    [SerializeField] private float counterDriftStartSpeed = 5;
+    [SerializeField] private float counterDriftStopSpeed = 10;
+    [SerializeField] private float maxCounterDriftAngularAccel = 50;
+    [SerializeField] private float driftWheelFriction;
     [Header("=== Boost ===")]
-    public float boostForce = 10;
+    [SerializeField] private float boostForce = 10;
     [Tooltip("boost is in seconds")]
-    public float maxBoost = 3f;
-    public float boostRechargeRate = 0.5f;
-    public float boostRechargeDelay = 2f;
+    [SerializeField] private float maxBoost = 3f;
+    [SerializeField] private float boostRechargeRate = 0.5f;
+    [SerializeField] private float maxBoostRechargeCooldown = 2f;
+    private float boostRechargeCooldown = 2f;
 
     private bool FullyGrounded => wheelColliders.FLWheel.isGrounded && wheelColliders.FRWheel.isGrounded && wheelColliders.RLWheel.isGrounded && wheelColliders.RRWheel.isGrounded;
-    
-    public float brakePower;
+    [Header("=== Breaking ===")]
+    [SerializeField] private float brakePower;
+    [Header("=== Torque/Acceleration ===")]
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
-    public AnimationCurve torqueCurve;
+    [SerializeField] private AnimationCurve torqueCurve;
     [Tooltip("basically accelleration")]
-    public float maxTorque;
-    public float initialAccelleration = 5;
-    public float initialAccellerationMaxSpeed = 5;
+    [SerializeField] private float maxTorque;
+    [SerializeField] private float initialAccelleration = 5;
+    [SerializeField] private float initialAccellerationMaxSpeed = 5;
     [Tooltip("The speed at which torque becomes 0 in m/s")]
-    public float maxSpeed;
+    [SerializeField] private float maxSpeed;
     
     [Header("=== For Debugging ===")]
     public float slipAngle;
     public float gasInput;
     public float brakeInput;
     public float steeringInput;
+    public bool boostInput;
+    public bool driftInput;
+    [Header("=== Input Debugging ===")]
     public float remainingBoost;
-    
-    private bool boostInput;
-    private bool driftInput;
-    private float targetSteeringAngle;
-    private float steeringAngle;
+    public float targetSteeringAngle;
+    public float steeringAngle;
 
     private Dictionary<WheelCollider, float> visualWheelRotations = new Dictionary<WheelCollider, float>();
     
@@ -93,7 +150,7 @@ public class CarController : MonoBehaviour
     void Update()
     {
         speed = playerRB.velocity.magnitude;
-        CheckInput();
+        //CheckInput();
         ApplyDrift();
         ApplySteering();
         ApplyBrake();
@@ -108,8 +165,12 @@ public class CarController : MonoBehaviour
     private void FixedUpdate()
     {
         ApplyMotor();
-        
-        //ApplyBoost();
+        ApplyBoost();
+        ApplyCounterDriftTorque();
+    }
+
+    private void ApplyCounterDriftTorque()
+    {
         float counterDriftTorque = 0;
         if(slipAngle > maxDriftAngleStart && driftInput && gasInput != 0 && FullyGrounded && speed > counterDriftStartSpeed)
         {
@@ -125,17 +186,27 @@ public class CarController : MonoBehaviour
             playerRB.AddTorque(transform.up * (counterDriftTorque * direction), ForceMode.Acceleration);
         }
     }
+
+    public void SetInput(CarInput input)
+    {
+        gasInput = input.gasInput;
+        //TODO: change this to getaxis raw
+        steeringInput = input.steeringInput;
+        driftInput = input.driftInput;
+        boostInput = input.boostInput;
+    }
     
     void CheckInput()
     {
         gasInput = Input.GetAxisRaw("Vertical");
         //TODO: change this to getaxis raw
         steeringInput = Input.GetAxis("Horizontal");
-        slipAngle = Vector3.Angle(transform.forward, playerRB.velocity-transform.forward);
-
         driftInput = Input.GetButton("Drift");
         boostInput = Input.GetButton("Boost");
-
+    }
+    
+    void ApplyBrake()
+    {
         //fixed code to brake even after going on reverse 
         float movingDirection = Vector3.Dot(transform.forward, playerRB.velocity);
         if (movingDirection < -0.5f && gasInput > 0)
@@ -154,10 +225,7 @@ public class CarController : MonoBehaviour
         {
             brakeInput = 0;
         }
-    }
-    
-    void ApplyBrake()
-    {
+        
         wheelColliders.FRWheel.brakeTorque = brakeInput * brakePower* 0.7f ;
         wheelColliders.FLWheel.brakeTorque = brakeInput * brakePower * 0.7f;
 
@@ -189,15 +257,25 @@ public class CarController : MonoBehaviour
             wheelColliders.RLWheel.sidewaysFriction = rlFriction;
         }
     }
-    /*
+    
     void ApplyBoost()
     {
-        if(boostInput && )
+        if(boostInput && remainingBoost > 0)
         {
-            playerRB.AddForce(transform.forward * boostForce, ForceMode.Force);
+            playerRB.AddForce(transform.forward * boostForce, ForceMode.Acceleration);
+            remainingBoost = Mathf.Clamp(remainingBoost - Time.fixedDeltaTime, 0, maxBoost);
+            boostRechargeCooldown = maxBoostRechargeCooldown;
+        }
+        else if(remainingBoost < maxBoost && boostRechargeCooldown <= 0)
+        {
+            remainingBoost = Mathf.Clamp(remainingBoost + boostRechargeRate * Time.fixedDeltaTime, 0, maxBoost);
+        }
+        else if(boostRechargeCooldown > 0)
+        {
+            boostRechargeCooldown = Mathf.Clamp(boostRechargeCooldown -= Time.fixedDeltaTime, 0, maxBoostRechargeCooldown);
         }
     }
-  */  
+  
     void ApplyMotor() 
     {
         wheelColliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
@@ -226,6 +304,7 @@ public class CarController : MonoBehaviour
     
     void ApplySteering()
     {
+        slipAngle = Vector3.Angle(transform.forward, playerRB.velocity-transform.forward);
         targetSteeringAngle = steeringInput * steeringCurve.Evaluate(speed);
         if (slipAngle < 120f)
         {
@@ -297,7 +376,14 @@ public class CarController : MonoBehaviour
         if(!visualWheelRotations.ContainsKey(_wheelCollider))
             visualWheelRotations[_wheelCollider] = 0;
         visualWheelRotations[_wheelCollider] = (visualWheelRotations[_wheelCollider] + _wheelCollider.rpm * 0.016666f * 360 * Time.deltaTime) % 360;
-        _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], angle, 0);
+        if(_wheelCollider.isGrounded)
+        {
+            _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], angle, 0);
+        }
+        else
+        {
+            _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], 0, 0);
+        }
     }
 
     public void OnDrawGizmos()
@@ -306,28 +392,3 @@ public class CarController : MonoBehaviour
     }
 }
 
-[System.Serializable]
-public class WheelColliders
-{
-    public WheelCollider FLWheel;
-    public WheelCollider FRWheel;
-    public WheelCollider RLWheel;
-    public WheelCollider RRWheel;
-}
-[System.Serializable]
-public class VisualWheels
-{
-    public Transform FLWheel;
-    public Transform FRWheel;
-    public Transform RLWheel;
-    public Transform RRWheel;
-}
-[System.Serializable]
-public class WheelParticles{
-    public ParticleSystem FLWheel;
-    public ParticleSystem FRWheel;
-    public ParticleSystem RLWheel;
-    public ParticleSystem RRWheel;
-
-    public bool ParticlesExist => (FLWheel != null) && (FRWheel != null) && (RLWheel != null) && (RRWheel != null);
-}
