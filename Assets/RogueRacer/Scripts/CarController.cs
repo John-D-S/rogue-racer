@@ -30,6 +30,26 @@ public class WheelParticles
 
     public bool ParticlesExist => (FLWheel != null) && (FRWheel != null) && (RLWheel != null) && (RRWheel != null);
 }
+
+[System.Serializable]
+public class JointSpringSerializable
+{
+    public float spring;
+    public float damper;
+    public float targetPosition;
+}
+
+[System.Serializable]
+public class WheelFrictionCurveSerializable
+{
+    public float stiffness;
+    public float asymptoteSlip;
+    public float asymptoteValue;
+    public float extremumSlip;
+    public float extremumValue;
+}
+
+
 [System.Serializable]
 public class WheelSettings
 {
@@ -39,9 +59,9 @@ public class WheelSettings
     public float suspensionDistance;
     public float forceAppPointDistance;
     public Vector3 center;
-    public JointSpring suspensionSpring;
-    public WheelFrictionCurve forwardFriction;
-    public WheelFrictionCurve sidewaysFriction;
+    public JointSpringSerializable suspensionSpring;
+    public WheelFrictionCurveSerializable forwardFriction;
+    public WheelFrictionCurveSerializable sidewaysFriction;
 
     public void SetWheelColliderSettings(ref WheelCollider _wheel)
     {
@@ -51,10 +71,42 @@ public class WheelSettings
         _wheel.suspensionDistance = suspensionDistance;
         _wheel.forceAppPointDistance = forceAppPointDistance;
         _wheel.center = center;
-        _wheel.suspensionSpring = suspensionSpring;
-        _wheel.forwardFriction = forwardFriction;
-        _wheel.sidewaysFriction = sidewaysFriction;
+        _wheel.suspensionSpring = new JointSpring()
+        {
+            spring = suspensionSpring.spring,
+            damper = suspensionSpring.damper,
+            targetPosition = suspensionSpring.targetPosition
+        };
+        _wheel.forwardFriction = new WheelFrictionCurve()
+        {
+            stiffness = forwardFriction.stiffness,
+            asymptoteSlip = forwardFriction.asymptoteSlip,
+            asymptoteValue = forwardFriction.asymptoteValue,
+            extremumSlip = forwardFriction.extremumSlip,
+            extremumValue = forwardFriction.extremumValue
+        };
+        _wheel.sidewaysFriction = new WheelFrictionCurve()
+        {
+            stiffness = sidewaysFriction.stiffness,
+            asymptoteSlip = sidewaysFriction.asymptoteSlip,
+            asymptoteValue = sidewaysFriction.asymptoteValue,
+            extremumSlip = sidewaysFriction.extremumSlip,
+            extremumValue = sidewaysFriction.extremumValue
+        };
     }
+
+    public WheelSettings(float mass, float radius, float wheelDampingRate, float suspensionDistance, float forceAppPointDistance, Vector3 center, JointSpringSerializable suspensionSpring, WheelFrictionCurveSerializable forwardFriction, WheelFrictionCurveSerializable sidewaysFriction)
+    {
+        this.mass = mass;
+        this.radius = radius;
+        this.wheelDampingRate = wheelDampingRate;
+        this.suspensionDistance = suspensionDistance;
+        this.forceAppPointDistance = forceAppPointDistance;
+        this.center = center;
+        this.suspensionSpring = suspensionSpring;
+        this.forwardFriction = forwardFriction;
+        this.sidewaysFriction = sidewaysFriction;
+    } 
 }
 
 public struct CarInput
@@ -77,6 +129,7 @@ public class CarController : MonoBehaviour
     [SerializeField] private AnimationCurve steeringCurve = new AnimationCurve(new Keyframe(0, 30, 0, 0), new Keyframe(60, 10));
     [SerializeField] private float steerLerpSpeed;
     [SerializeField] private float normalWheelFriction;
+    [SerializeField] private float driftWheelFriction;
     [Range(0, 180)]
     [SerializeField] private float maxDriftAngleStart = 80;
     [Range(0, 180)]
@@ -84,7 +137,6 @@ public class CarController : MonoBehaviour
     [SerializeField] private float counterDriftStartSpeed = 5;
     [SerializeField] private float counterDriftStopSpeed = 10;
     [SerializeField] private float maxCounterDriftAngularAccel = 50;
-    [SerializeField] private float driftWheelFriction;
     [Header("=== Boost ===")]
     [SerializeField] private float boostForce = 10;
     [Tooltip("boost is in seconds")]
