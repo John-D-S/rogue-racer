@@ -31,84 +31,6 @@ public class WheelParticles
     public bool ParticlesExist => (FLWheel != null) && (FRWheel != null) && (RLWheel != null) && (RRWheel != null);
 }
 
-[System.Serializable]
-public class JointSpringSerializable
-{
-    public float spring;
-    public float damper;
-    public float targetPosition;
-}
-
-[System.Serializable]
-public class WheelFrictionCurveSerializable
-{
-    public float stiffness;
-    public float asymptoteSlip;
-    public float asymptoteValue;
-    public float extremumSlip;
-    public float extremumValue;
-}
-
-
-[System.Serializable]
-public class WheelSettings
-{
-    public float mass;
-    public float radius;
-    public float wheelDampingRate;
-    public float suspensionDistance;
-    public float forceAppPointDistance;
-    public Vector3 center;
-    public JointSpringSerializable suspensionSpring;
-    public WheelFrictionCurveSerializable forwardFriction;
-    public WheelFrictionCurveSerializable sidewaysFriction;
-
-    public void SetWheelColliderSettings(ref WheelCollider _wheel)
-    {
-        _wheel.mass = mass;
-        _wheel.radius = radius;
-        _wheel.wheelDampingRate = wheelDampingRate;
-        _wheel.suspensionDistance = suspensionDistance;
-        _wheel.forceAppPointDistance = forceAppPointDistance;
-        _wheel.center = center;
-        _wheel.suspensionSpring = new JointSpring()
-        {
-            spring = suspensionSpring.spring,
-            damper = suspensionSpring.damper,
-            targetPosition = suspensionSpring.targetPosition
-        };
-        _wheel.forwardFriction = new WheelFrictionCurve()
-        {
-            stiffness = forwardFriction.stiffness,
-            asymptoteSlip = forwardFriction.asymptoteSlip,
-            asymptoteValue = forwardFriction.asymptoteValue,
-            extremumSlip = forwardFriction.extremumSlip,
-            extremumValue = forwardFriction.extremumValue
-        };
-        _wheel.sidewaysFriction = new WheelFrictionCurve()
-        {
-            stiffness = sidewaysFriction.stiffness,
-            asymptoteSlip = sidewaysFriction.asymptoteSlip,
-            asymptoteValue = sidewaysFriction.asymptoteValue,
-            extremumSlip = sidewaysFriction.extremumSlip,
-            extremumValue = sidewaysFriction.extremumValue
-        };
-    }
-
-    public WheelSettings(float mass, float radius, float wheelDampingRate, float suspensionDistance, float forceAppPointDistance, Vector3 center, JointSpringSerializable suspensionSpring, WheelFrictionCurveSerializable forwardFriction, WheelFrictionCurveSerializable sidewaysFriction)
-    {
-        this.mass = mass;
-        this.radius = radius;
-        this.wheelDampingRate = wheelDampingRate;
-        this.suspensionDistance = suspensionDistance;
-        this.forceAppPointDistance = forceAppPointDistance;
-        this.center = center;
-        this.suspensionSpring = suspensionSpring;
-        this.forwardFriction = forwardFriction;
-        this.sidewaysFriction = sidewaysFriction;
-    } 
-}
-
 public struct CarInput
 {
     public float gasInput;
@@ -119,44 +41,26 @@ public struct CarInput
 
 public class CarController : MonoBehaviour
 {
-    private Rigidbody playerRB; 
-    [SerializeField] private Vector3 centerOfMass;
-    [SerializeField] private WheelColliders wheelColliders;
-    [SerializeField] private VisualWheels visualWheels;
-    [SerializeField] private WheelParticles wheelParticles;
-    [SerializeField] private GameObject smokePrefab;
-    [SerializeField] private float visualMaxSteeringAngle = 45;
-    [SerializeField] private AnimationCurve steeringCurve = new AnimationCurve(new Keyframe(0, 30, 0, 0), new Keyframe(60, 10));
-    [SerializeField] private float steerLerpSpeed;
-    [SerializeField] private float normalWheelFriction;
-    [SerializeField] private float driftWheelFriction;
-    [Range(0, 180)]
-    [SerializeField] private float maxDriftAngleStart = 80;
-    [Range(0, 180)]
-    [SerializeField] private float maxDriftAngleStop = 125;
-    [SerializeField] private float counterDriftStartSpeed = 5;
-    [SerializeField] private float counterDriftStopSpeed = 10;
-    [SerializeField] private float maxCounterDriftAngularAccel = 50;
-    [Header("=== Boost ===")]
-    [SerializeField] private float boostForce = 10;
-    [Tooltip("boost is in seconds")]
-    [SerializeField] private float maxBoost = 3f;
-    [SerializeField] private float boostRechargeRate = 0.5f;
-    [SerializeField] private float maxBoostRechargeCooldown = 2f;
-    private float boostRechargeCooldown = 2f;
+    private Rigidbody playerRB;
+    [SerializeField, Tooltip("The center of mass of the car.")] 
+    private Vector3 centerOfMass;
+    [SerializeField, Tooltip("The wheel colliders for the car.")] 
+    private WheelColliders wheelColliders;
+    [SerializeField, Tooltip("The visual wheel transforms.")] 
+    private VisualWheels visualWheels;
+    [SerializeField, Tooltip("The wheel particles for smoke effects.")] 
+    private WheelParticles wheelParticles;
+    [SerializeField, Tooltip("The smoke particle prefab.")] 
+    private GameObject smokePrefab;
+    [SerializeField, Tooltip("The base car settings.")] 
+    private BaseCarSettings carSettings;
 
+    private float boostRechargeCooldown = 2f;
+    
+    /// <summary>
+    /// Checks if all wheels are grounded.
+    /// </summary>
     private bool FullyGrounded => wheelColliders.FLWheel.isGrounded && wheelColliders.FRWheel.isGrounded && wheelColliders.RLWheel.isGrounded && wheelColliders.RRWheel.isGrounded;
-    [Header("=== Breaking ===")]
-    [SerializeField] private float brakePower;
-    [Header("=== Torque/Acceleration ===")]
-    [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
-    [SerializeField] private AnimationCurve torqueCurve;
-    [Tooltip("basically accelleration")]
-    [SerializeField] private float maxTorque;
-    [SerializeField] private float initialAccelleration = 5;
-    [SerializeField] private float initialAccellerationMaxSpeed = 5;
-    [Tooltip("The speed at which torque becomes 0 in m/s")]
-    [SerializeField] private float maxSpeed;
     
     [Header("=== For Debugging ===")]
     public float slipAngle;
@@ -177,7 +81,11 @@ public class CarController : MonoBehaviour
     public float MetPerSecToKilPerHour(float input) => input * 3.6f;
     public float KilPerHourToMetPerSec(float input) => input / 3.6f;
     
-    // Start is called before the first frame update
+    private List<Upgrade> collectedUpgrades = new List<Upgrade>();
+
+    /// <summary>
+    /// Initializes the car controller.
+    /// </summary>
     void Start()
     {
         playerRB = gameObject.GetComponent<Rigidbody>();
@@ -185,7 +93,10 @@ public class CarController : MonoBehaviour
         if(wheelParticles.ParticlesExist)
             InstantiateSmoke();
     }
-
+    
+    /// <summary>
+    /// Instantiates smoke particle systems for each wheel.
+    /// </summary>
     void InstantiateSmoke()
     {
         wheelParticles.FRWheel = Instantiate(smokePrefab, wheelColliders.FRWheel.transform.position - Vector3.up * wheelColliders.FRWheel.radius, Quaternion.identity, wheelColliders.FRWheel.transform)
@@ -198,36 +109,48 @@ public class CarController : MonoBehaviour
             .GetComponent<ParticleSystem>();
     }
 
-    // Update is called once per frame
+    /// <summary>
+    /// Updates the speed of the car and applies wheel positions and particles in every frame.
+    /// </summary>
     void Update()
     {
         speed = playerRB.velocity.magnitude;
-        //CheckInput();
-        ApplyDrift();
-        ApplySteering();
-        ApplyBrake();
         if(wheelParticles.ParticlesExist)
         {
             CheckParticles();
         }
         ApplyWheelPositions();
     }
-
     
+    /// <summary>
+    /// FixedUpdate function handles physics-based operations like applying drift, steering, brake, motor, boost, and counter drift torque.
+    /// </summary>
     private void FixedUpdate()
     {
-        ApplyMotor();
-        ApplyBoost();
-        ApplyCounterDriftTorque();
+        CarSettings usedCarSettings = new(carSettings.CarSettings);
+        foreach(Upgrade collectedUpgrade in collectedUpgrades)
+        {
+            collectedUpgrade.OnFixedUpdate(this, ref usedCarSettings);
+        }
+        ApplyDrift(usedCarSettings);
+        ApplySteering(usedCarSettings);
+        ApplyBrake(usedCarSettings);
+        ApplyMotor(usedCarSettings);
+        ApplyBoost(usedCarSettings);
+        ApplyCounterDriftTorque(usedCarSettings);
     }
 
-    private void ApplyCounterDriftTorque()
+    /// <summary>
+    /// Applies counter drift torque to the car based on the car's slip angle, drift input, and speed.
+    /// </summary>
+    /// <param name="usedCarSettings">The car settings to be used for calculations.</param>
+    private void ApplyCounterDriftTorque(CarSettings usedCarSettings)
     {
         float counterDriftTorque = 0;
-        if(slipAngle > maxDriftAngleStart && driftInput && gasInput != 0 && FullyGrounded && speed > counterDriftStartSpeed)
+        if(slipAngle > usedCarSettings.maxDriftAngleStart && driftInput && gasInput != 0 && FullyGrounded && speed > usedCarSettings.counterDriftStartSpeed)
         {
-            float speedModifier = Mathf.Lerp(0, 1, speed - counterDriftStartSpeed / counterDriftStopSpeed - counterDriftStartSpeed);
-            counterDriftTorque = Mathf.Pow(Mathf.Lerp(0, 1, (slipAngle - maxDriftAngleStart) / (maxDriftAngleStop - maxDriftAngleStart)), 2) * maxCounterDriftAngularAccel * speedModifier;
+            float speedModifier = Mathf.Lerp(0, 1, speed - usedCarSettings.counterDriftStartSpeed / usedCarSettings.counterDriftStopSpeed - usedCarSettings.counterDriftStartSpeed);
+            counterDriftTorque = Mathf.Pow(Mathf.Lerp(0, 1, (slipAngle - usedCarSettings.maxDriftAngleStart) / (usedCarSettings.maxDriftAngleStop - usedCarSettings.maxDriftAngleStart)), 2) * usedCarSettings.maxCounterDriftAngularAccel * speedModifier;
             int direction = Vector3.Dot(transform.right, playerRB.velocity) > 1
                 ? 1
                 : -1;
@@ -239,25 +162,23 @@ public class CarController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Sets the car's input based on the given CarInput object.
+    /// </summary>
+    /// <param name="input">The CarInput object containing gas, steering, drift, and boost inputs.</param>
     public void SetInput(CarInput input)
     {
         gasInput = input.gasInput;
-        //TODO: change this to getaxis raw
         steeringInput = input.steeringInput;
         driftInput = input.driftInput;
         boostInput = input.boostInput;
     }
-    
-    void CheckInput()
-    {
-        gasInput = Input.GetAxisRaw("Vertical");
-        //TODO: change this to getaxis raw
-        steeringInput = Input.GetAxis("Horizontal");
-        driftInput = Input.GetButton("Drift");
-        boostInput = Input.GetButton("Boost");
-    }
-    
-    void ApplyBrake()
+
+    /// <summary>
+    /// Applies brake to the car based on the car's moving direction and gas input.
+    /// </summary>
+    /// <param name="usedCarSettings">The car settings to be used for calculations.</param>
+    void ApplyBrake(CarSettings usedCarSettings)
     {
         //fixed code to brake even after going on reverse 
         float movingDirection = Vector3.Dot(transform.forward, playerRB.velocity);
@@ -278,64 +199,71 @@ public class CarController : MonoBehaviour
             brakeInput = 0;
         }
         
-        wheelColliders.FRWheel.brakeTorque = brakeInput * brakePower* 0.7f ;
-        wheelColliders.FLWheel.brakeTorque = brakeInput * brakePower * 0.7f;
+        wheelColliders.FRWheel.brakeTorque = brakeInput * usedCarSettings.brakePower* 0.7f ;
+        wheelColliders.FLWheel.brakeTorque = brakeInput * usedCarSettings.brakePower * 0.7f;
 
-        wheelColliders.RRWheel.brakeTorque = brakeInput * brakePower * 0.3f;
-        wheelColliders.RLWheel.brakeTorque = brakeInput * brakePower * 0.3f;
+        wheelColliders.RRWheel.brakeTorque = brakeInput * usedCarSettings.brakePower * 0.3f;
+        wheelColliders.RLWheel.brakeTorque = brakeInput * usedCarSettings.brakePower * 0.3f;
     }
 
-    void ApplyDrift()
+    /// <summary>
+    /// Applies drift to the car based on the drift input.
+    /// </summary>
+    /// <param name="usedCarSettings">The car settings to be used for calculations.</param>
+    void ApplyDrift(CarSettings usedCarSettings)
     {
         var rrFriction = wheelColliders.RRWheel.sidewaysFriction;
         var rlFriction = wheelColliders.RLWheel.sidewaysFriction;
         if(driftInput)
         {
-            
-            /*
-            rrFriction.stiffness = driftWheelFriction;
-            rlFriction.stiffness = driftWheelFriction;
-            */
-            rrFriction.stiffness = driftWheelFriction;
-            rlFriction.stiffness = driftWheelFriction;
+            rrFriction.stiffness = usedCarSettings.driftWheelFriction;
+            rlFriction.stiffness = usedCarSettings.driftWheelFriction;
             wheelColliders.RRWheel.sidewaysFriction = rrFriction;
             wheelColliders.RLWheel.sidewaysFriction = rlFriction;
         }
         else
         {
-            rrFriction.stiffness = normalWheelFriction;
-            rlFriction.stiffness = normalWheelFriction;
+            rrFriction.stiffness = usedCarSettings.normalWheelFriction;
+            rlFriction.stiffness = usedCarSettings.normalWheelFriction;
             wheelColliders.RRWheel.sidewaysFriction = rrFriction;
             wheelColliders.RLWheel.sidewaysFriction = rlFriction;
         }
     }
     
-    void ApplyBoost()
+    /// <summary>
+    /// Applies boost to the car based on the boost input, remaining boost, and recharge cooldown.
+    /// </summary>
+    /// <param name="usedCarSettings">The car settings to be used for calculations.</param>
+    void ApplyBoost(CarSettings usedCarSettings)
     {
         if(boostInput && remainingBoost > 0)
         {
-            playerRB.AddForce(transform.forward * boostForce, ForceMode.Acceleration);
-            remainingBoost = Mathf.Clamp(remainingBoost - Time.fixedDeltaTime, 0, maxBoost);
-            boostRechargeCooldown = maxBoostRechargeCooldown;
+            playerRB.AddForce(transform.forward * usedCarSettings.boostForce, ForceMode.Acceleration);
+            remainingBoost = Mathf.Clamp(remainingBoost - Time.fixedDeltaTime, 0, usedCarSettings.maxBoost);
+            boostRechargeCooldown = usedCarSettings.maxBoostRechargeCooldown;
         }
-        else if(remainingBoost < maxBoost && boostRechargeCooldown <= 0)
+        else if(remainingBoost < usedCarSettings.maxBoost && boostRechargeCooldown <= 0)
         {
-            remainingBoost = Mathf.Clamp(remainingBoost + boostRechargeRate * Time.fixedDeltaTime, 0, maxBoost);
+            remainingBoost = Mathf.Clamp(remainingBoost + usedCarSettings.boostRechargeRate * Time.fixedDeltaTime, 0, usedCarSettings.maxBoost);
         }
         else if(boostRechargeCooldown > 0)
         {
-            boostRechargeCooldown = Mathf.Clamp(boostRechargeCooldown -= Time.fixedDeltaTime, 0, maxBoostRechargeCooldown);
+            boostRechargeCooldown = Mathf.Clamp(boostRechargeCooldown -= Time.fixedDeltaTime, 0, usedCarSettings.maxBoostRechargeCooldown);
         }
     }
   
-    void ApplyMotor() 
+    /// <summary>
+    /// ApplyMotor adjusts the torque of the rear wheels based on the car's settings and speed, and adds an initial acceleration force to get the car moving.
+    /// </summary>
+    /// <param name="usedCarSettings">A CarSettings object containing the car's settings.</param>
+    void ApplyMotor(CarSettings usedCarSettings)
     {
-        wheelColliders.RRWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
-        wheelColliders.RLWheel.motorTorque = torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput;
+        wheelColliders.RRWheel.motorTorque = usedCarSettings.torqueCurve.Evaluate(speed/usedCarSettings.maxSpeed) * usedCarSettings.maxTorque * gasInput;
+        wheelColliders.RLWheel.motorTorque = usedCarSettings.torqueCurve.Evaluate(speed/usedCarSettings.maxSpeed) * usedCarSettings.maxTorque * gasInput;
         
         //this code will add an additinal accelleration to get the car started moving
-        float forceAmount = Mathf.Lerp(initialAccelleration, 0, Mathf.InverseLerp(0, initialAccellerationMaxSpeed, speed)) * gasInput * 0.5f;
-        if(speed < initialAccellerationMaxSpeed)
+        float forceAmount = Mathf.Lerp(usedCarSettings.initialAccelleration, 0, Mathf.InverseLerp(0, usedCarSettings.initialAccellerationMaxSpeed, speed)) * gasInput * 0.5f;
+        if(speed < usedCarSettings.initialAccellerationMaxSpeed)
         {
             if(wheelColliders.RRWheel.isGrounded)
             {
@@ -349,34 +277,42 @@ public class CarController : MonoBehaviour
                 playerRB.AddForceAtPosition(transform.forward * forceAmount, forcePosL, ForceMode.Acceleration);
             }
         }
-        
-        //Debug.Log(speed);
-        //Debug.Log(torqueCurve.Evaluate(speed/maxSpeed) * maxTorque * gasInput);
     }
     
-    void ApplySteering()
+    /// <summary>
+    /// ApplySteering calculates and applies the steering angle for the front wheels based on the car's settings, speed, and slip angle.
+    /// </summary>
+    /// <param name="usedCarSettings">A CarSettings object containing the car's settings.</param>
+    void ApplySteering(CarSettings usedCarSettings)
     {
         slipAngle = Vector3.Angle(transform.forward, playerRB.velocity-transform.forward);
-        targetSteeringAngle = steeringInput * steeringCurve.Evaluate(speed);
+        targetSteeringAngle = steeringInput * usedCarSettings.steeringCurve.Evaluate(speed);
         if (slipAngle < 120f)
         {
             targetSteeringAngle += Vector3.SignedAngle(transform.forward, playerRB.velocity + transform.forward, transform.up);
         }
         targetSteeringAngle = Mathf.Clamp(targetSteeringAngle, -90f, 90f);
-        steeringAngle = Mathf.Lerp(steeringAngle, targetSteeringAngle, Time.deltaTime * steerLerpSpeed);
+        steeringAngle = Mathf.Lerp(steeringAngle, targetSteeringAngle, Time.fixedDeltaTime * usedCarSettings.steerLerpSpeed);
         wheelColliders.FRWheel.steerAngle = steeringAngle;
         wheelColliders.FLWheel.steerAngle = steeringAngle;
     }
 
+    /// <summary>
+    /// ApplyWheelPositions updates the position and rotation of the visual wheels based on the corresponding wheel colliders.
+    /// </summary>
     void ApplyWheelPositions()
     {
-        float visualSteeringAngle = Mathf.Clamp(targetSteeringAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
-        UpdateWheel(wheelColliders.FRWheel, visualWheels.FRWheel, visualSteeringAngle);
+        float visualSteeringAngle = Mathf.Clamp(targetSteeringAngle, -carSettings.CarSettings.visualMaxSteeringAngle, carSettings.CarSettings.visualMaxSteeringAngle);
+        Debug.Log(visualSteeringAngle);
+        UpdateWheel(wheelColliders.FRWheel, visualWheels.FRWheel, visualSteeringAngle, true);
         UpdateWheel(wheelColliders.FLWheel, visualWheels.FLWheel, visualSteeringAngle);
         UpdateWheel(wheelColliders.RRWheel, visualWheels.RRWheel, 0);
         UpdateWheel(wheelColliders.RLWheel, visualWheels.RLWheel, 0);
     }
     
+    /// <summary>
+    /// CheckParticles checks the slip conditions of each wheel and starts or stops the corresponding particle systems to simulate tire smoke.
+    /// </summary>
     void CheckParticles() {
         WheelHit[] wheelHits = new WheelHit[4];
         wheelColliders.FRWheel.GetGroundHit(out wheelHits[0]);
@@ -416,21 +352,26 @@ public class CarController : MonoBehaviour
         }
     }
     
-    void UpdateWheel(WheelCollider _wheelCollider, Transform _visualWheelTransform, float _steeringAngle)
+    /// <summary>
+    /// UpdateWheel updates the position and rotation of a visual wheel based on its corresponding WheelCollider and an optional steering angle.
+    /// </summary>
+    /// <param name="_wheelCollider">The WheelCollider to update the visual wheel from.</param>
+    /// <param name="_visualWheelTransform">The Transform of the visual wheel to be updated.</param>
+    /// <param name="_visualSteeringAngle">The optional steering angle to apply to the visual wheel, defaults to 0.</param>
+    void UpdateWheel(WheelCollider _wheelCollider, Transform _visualWheelTransform, float _visualSteeringAngle, bool DEBUG = false)
     {
         Quaternion quat;
         Vector3 position;
         _wheelCollider.GetWorldPose(out position, out quat);
-        //Vector3 visualWheelRot = new Vector3(0, _steeringAngle, 0);
-        //_visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRot);
         _visualWheelTransform.position = position;
-        float angle = Mathf.Clamp(_wheelCollider.steerAngle, -visualMaxSteeringAngle, visualMaxSteeringAngle);
+        float absoulteSteeringAngle = Mathf.Abs(_wheelCollider.steerAngle);
+        float clampedVisualSteeringAngle = Mathf.Clamp(_visualSteeringAngle, -absoulteSteeringAngle, absoulteSteeringAngle);
         if(!visualWheelRotations.ContainsKey(_wheelCollider))
             visualWheelRotations[_wheelCollider] = 0;
         visualWheelRotations[_wheelCollider] = (visualWheelRotations[_wheelCollider] + _wheelCollider.rpm * 0.016666f * 360 * Time.deltaTime) % 360;
         if(_wheelCollider.isGrounded)
         {
-            _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], angle, 0);
+            _visualWheelTransform.rotation = transform.rotation * Quaternion.Euler(visualWheelRotations[_wheelCollider], clampedVisualSteeringAngle, 0);
         }
         else
         {
@@ -438,6 +379,46 @@ public class CarController : MonoBehaviour
         }
     }
 
+    private void CheckForCollectables()
+    {
+        //check within a radius of 5 units for upgrades
+        Collider[] colliders = Physics.OverlapSphere(transform.position, attractionRadius, pickupLayer);
+
+        foreach (Collider collider in colliders)
+        {
+            float distance = Vector3.Distance(transform.position, collider.transform.position);
+            if (distance <= pickupRadius)
+            {
+                Upgrade upgrade = collider.GetComponent<Upgrade>();
+                if (upgrade != null)
+                {
+                    CollectUpgrade(upgrade);
+                    continue;
+                }
+
+                Coin coin = collider.GetComponent<Coin>();
+                if (coin != null)
+                {
+                    CollectCoin(coin);
+                }
+            }
+            else
+            {
+                Vector3 attractionDirection = (transform.position - collider.transform.position).normalized;
+                float speedMultiplier = (1 - (distance / attractionRadius));
+                collider.transform.position += attractionDirection * attractionSpeed * speedMultiplier * Time.deltaTime;
+            }
+        }
+
+        
+    }
+    
+    public void AddUpgrade(Upgrade upgrade)
+    {
+        collectedUpgrades.Add(upgrade);
+        upgrade.OnPickup(this);
+    }
+    
     public void OnDrawGizmos()
     {
         Gizmos.DrawSphere(transform.position + transform.rotation * centerOfMass, 0.25f);

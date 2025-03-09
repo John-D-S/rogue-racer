@@ -3,6 +3,132 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
+public class JointSpringSerializable
+{
+    public float spring;
+    public float damper;
+    public float targetPosition;
+    
+    public JointSpringSerializable(float _spring, float _damper, float _targetPosition)
+    {
+        spring = _spring;
+        damper = _damper;
+        targetPosition = _targetPosition;
+    }
+    
+    // Copy constructor
+    public JointSpringSerializable(JointSpringSerializable other)
+    {
+        spring = other.spring;
+        damper = other.damper;
+        targetPosition = other.targetPosition;
+    }
+}
+
+[System.Serializable]
+public class WheelFrictionCurveSerializable
+{
+    public float stiffness;
+    public float asymptoteSlip;
+    public float asymptoteValue;
+    public float extremumSlip;
+    public float extremumValue;
+    
+    public WheelFrictionCurveSerializable(float _stiffness, float _asymptoteSlip, float _asymptoteValue, float _extremumSlip, float _extremumValue)
+    {
+        stiffness = _stiffness;
+        asymptoteSlip = _asymptoteSlip;
+        asymptoteValue = _asymptoteValue;
+        extremumSlip = _extremumSlip;
+        extremumValue = _extremumValue;
+    }
+    
+    // Copy constructor
+    public WheelFrictionCurveSerializable(WheelFrictionCurveSerializable other)
+    {
+        stiffness = other.stiffness;
+        asymptoteSlip = other.asymptoteSlip;
+        asymptoteValue = other.asymptoteValue;
+        extremumSlip = other.extremumSlip;
+        extremumValue = other.extremumValue;
+    }
+}
+
+
+[System.Serializable]
+public class WheelSettings
+{
+    public float mass;
+    public float radius;
+    public float wheelDampingRate;
+    public float suspensionDistance;
+    public float forceAppPointDistance;
+    public Vector3 center;
+    public JointSpringSerializable suspensionSpring;
+    public WheelFrictionCurveSerializable forwardFriction;
+    public WheelFrictionCurveSerializable sidewaysFriction;
+
+    public void SetWheelColliderSettings(ref WheelCollider _wheel)
+    {
+        _wheel.mass = mass;
+        _wheel.radius = radius;
+        _wheel.wheelDampingRate = wheelDampingRate;
+        _wheel.suspensionDistance = suspensionDistance;
+        _wheel.forceAppPointDistance = forceAppPointDistance;
+        _wheel.center = center;
+        _wheel.suspensionSpring = new JointSpring()
+        {
+            spring = suspensionSpring.spring,
+            damper = suspensionSpring.damper,
+            targetPosition = suspensionSpring.targetPosition
+        };
+        _wheel.forwardFriction = new WheelFrictionCurve()
+        {
+            stiffness = forwardFriction.stiffness,
+            asymptoteSlip = forwardFriction.asymptoteSlip,
+            asymptoteValue = forwardFriction.asymptoteValue,
+            extremumSlip = forwardFriction.extremumSlip,
+            extremumValue = forwardFriction.extremumValue
+        };
+        _wheel.sidewaysFriction = new WheelFrictionCurve()
+        {
+            stiffness = sidewaysFriction.stiffness,
+            asymptoteSlip = sidewaysFriction.asymptoteSlip,
+            asymptoteValue = sidewaysFriction.asymptoteValue,
+            extremumSlip = sidewaysFriction.extremumSlip,
+            extremumValue = sidewaysFriction.extremumValue
+        };
+    }
+
+    public WheelSettings(float mass, float radius, float wheelDampingRate, float suspensionDistance, float forceAppPointDistance, Vector3 center, JointSpringSerializable suspensionSpring, WheelFrictionCurveSerializable forwardFriction, WheelFrictionCurveSerializable sidewaysFriction)
+    {
+        this.mass = mass;
+        this.radius = radius;
+        this.wheelDampingRate = wheelDampingRate;
+        this.suspensionDistance = suspensionDistance;
+        this.forceAppPointDistance = forceAppPointDistance;
+        this.center = center;
+        this.suspensionSpring = suspensionSpring;
+        this.forwardFriction = forwardFriction;
+        this.sidewaysFriction = sidewaysFriction;
+    }
+    
+    // Copy constructor
+    public WheelSettings(WheelSettings other)
+    {
+        mass = other.mass;
+        radius = other.radius;
+        wheelDampingRate = other.wheelDampingRate;
+        suspensionDistance = other.suspensionDistance;
+        forceAppPointDistance = other.forceAppPointDistance;
+        center = other.center;
+        suspensionSpring = new JointSpringSerializable(other.suspensionSpring);
+        forwardFriction = new WheelFrictionCurveSerializable(other.forwardFriction);
+        sidewaysFriction = new WheelFrictionCurveSerializable(other.sidewaysFriction);
+    }
+}
+
+[System.Serializable]
 public class CarSettings
 {
 	public WheelSettings frontWheelSettings = new WheelSettings(
@@ -14,31 +140,31 @@ public class CarSettings
 		0, 
 		Vector3.zero, 
 		new JointSpringSerializable
-		{
-			spring = 45000,
-			damper = 4500,
-			targetPosition = 0.85f
-		},
+		(
+			45000,
+			4500,
+			0.85f
+		),
 		new WheelFrictionCurveSerializable
-		{
-			asymptoteSlip = 0.4f,
-			asymptoteValue = 1,
-			extremumSlip = 0.8f,
-			extremumValue = 0.5f,
-			stiffness = 1
-		},
+		(
+			0.4f,
+			1,
+			0.8f,
+			0.5f,
+			1
+		),
 		new WheelFrictionCurveSerializable
-		{
-			asymptoteSlip = 0.2f,
-			asymptoteValue = 1,
-			extremumSlip = 0.5f,
-			extremumValue = 0.75f,
-			stiffness = 2
-		}
+		(
+			0.2f,
+			1,
+			0.5f,
+			0.75f,
+			2
+		)
 	);
 	#endregion
-	public WheelSettings backWheelSettings = new WheelSettings(
 	#region backWheelSettings default values
+	public WheelSettings backWheelSettings = new WheelSettings(
 		10, 
 		0.28f,
 		1,
@@ -46,27 +172,27 @@ public class CarSettings
 		0, 
 		Vector3.zero, 
 		new JointSpringSerializable
-		{
-			spring = 45000,
-			damper = 4500,
-			targetPosition = 0.85f
-		},
+		(
+			45000,
+			4500,
+			0.85f
+		),
 		new WheelFrictionCurveSerializable
-		{
-			asymptoteSlip = 0.4f,
-			asymptoteValue = 1,
-			extremumSlip = 0.8f,
-			extremumValue = 0.5f,
-			stiffness = 1
-		},
+		(
+			0.4f,
+			1,
+			0.8f,
+			0.5f,
+			1
+		),
 		new WheelFrictionCurveSerializable
-		{
-			asymptoteSlip = 0.2f,
-			asymptoteValue = 1,
-			extremumSlip = 0.5f,
-			extremumValue = 0.75f,
-			stiffness = 2
-		}
+		(
+			0.2f,
+			1,
+			0.5f,
+			0.75f,
+			2
+		)
 	);
 	#endregion
 	[Tooltip("The maximum amount of steering that can be visually shown")]
@@ -97,7 +223,7 @@ public class CarSettings
     public float maxBoostRechargeCooldown = 2f;
     
     [Header("=== Breaking ===")]
-    [SerializeField] private float brakePower = 5000;
+    public float brakePower = 5000;
     
     [Header("=== Torque/Acceleration ===")]
     [Tooltip("This is a 1x1 graph of the % of max torque against % of max speed")]
@@ -109,4 +235,30 @@ public class CarSettings
     public float initialAccellerationMaxSpeed = 15;
     [Tooltip("The speed at which torque becomes 0 in m/s")]
     public float maxSpeed = 20;
+    
+    public CarSettings(CarSettings other)
+    {
+	    frontWheelSettings = new WheelSettings(other.frontWheelSettings);
+	    backWheelSettings = new WheelSettings(other.backWheelSettings);
+	    visualMaxSteeringAngle = other.visualMaxSteeringAngle;
+	    steeringCurve = new AnimationCurve(other.steeringCurve.keys);
+	    steerLerpSpeed = other.steerLerpSpeed;
+	    normalWheelFriction = other.normalWheelFriction;
+	    driftWheelFriction = other.driftWheelFriction;
+	    maxDriftAngleStart = other.maxDriftAngleStart;
+	    maxDriftAngleStop = other.maxDriftAngleStop;
+	    counterDriftStartSpeed = other.counterDriftStartSpeed;
+	    counterDriftStopSpeed = other.counterDriftStopSpeed;
+	    maxCounterDriftAngularAccel = other.maxCounterDriftAngularAccel;
+	    boostForce = other.boostForce;
+	    maxBoost = other.maxBoost;
+	    boostRechargeRate = other.boostRechargeRate;
+	    maxBoostRechargeCooldown = other.maxBoostRechargeCooldown;
+	    brakePower = other.brakePower;
+	    torqueCurve = new AnimationCurve(other.torqueCurve.keys);
+	    maxTorque = other.maxTorque;
+	    initialAccelleration = other.initialAccelleration;
+	    initialAccellerationMaxSpeed = other.initialAccellerationMaxSpeed;
+	    maxSpeed = other.maxSpeed;
+    }
 }

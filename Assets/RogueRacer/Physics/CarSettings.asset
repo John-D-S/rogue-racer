@@ -1,0 +1,136 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 253fb97b35e4ba04babcaa38be68bdff, type: 3}
+  m_Name: CarSettings
+  m_EditorClassIdentifier: 
+  carSettings:
+    frontWheelSettings:
+      mass: 10
+      radius: 0.28
+      wheelDampingRate: 1
+      suspensionDistance: 0.15
+      forceAppPointDistance: 0
+      center: {x: 0, y: 0, z: 0}
+      suspensionSpring:
+        spring: 45000
+        damper: 4500
+        targetPosition: 0.85
+      forwardFriction:
+        stiffness: 1
+        asymptoteSlip: 0.4
+        asymptoteValue: 1
+        extremumSlip: 0.8
+        extremumValue: 0.5
+      sidewaysFriction:
+        stiffness: 2
+        asymptoteSlip: 0.2
+        asymptoteValue: 1
+        extremumSlip: 0.5
+        extremumValue: 0.75
+    backWheelSettings:
+      mass: 10
+      radius: 0.28
+      wheelDampingRate: 1
+      suspensionDistance: 0.15
+      forceAppPointDistance: 0
+      center: {x: 0, y: 0, z: 0}
+      suspensionSpring:
+        spring: 45000
+        damper: 4500
+        targetPosition: 0.85
+      forwardFriction:
+        stiffness: 1
+        asymptoteSlip: 0.4
+        asymptoteValue: 1
+        extremumSlip: 0.8
+        extremumValue: 0.5
+      sidewaysFriction:
+        stiffness: 2
+        asymptoteSlip: 0.2
+        asymptoteValue: 1
+        extremumSlip: 0.5
+        extremumValue: 0.75
+    visualMaxSteeringAngle: 45
+    steeringCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 30
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 60
+        value: 10
+        inSlope: -0.5
+        outSlope: -0.5
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    steerLerpSpeed: 10
+    normalWheelFriction: 2
+    driftWheelFriction: 0.75
+    maxDriftAngleStart: 60
+    maxDriftAngleStop: 90
+    counterDriftStartSpeed: 5
+    counterDriftStopSpeed: 10
+    maxCounterDriftAngularAccel: 25
+    boostForce: 10
+    maxBoost: 3
+    boostRechargeRate: 0.5
+    maxBoostRechargeCooldown: 2
+    brakePower: 5000
+    torqueCurve:
+      serializedVersion: 2
+      m_Curve:
+      - serializedVersion: 3
+        time: 0
+        value: 0.25
+        inSlope: 7
+        outSlope: 3.5
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 0.5
+        value: 1
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      - serializedVersion: 3
+        time: 1
+        value: 0
+        inSlope: 0
+        outSlope: 0
+        tangentMode: 0
+        weightedMode: 0
+        inWeight: 0
+        outWeight: 0
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+    maxTorque: 1500
+    initialAccelleration: 10
+    initialAccellerationMaxSpeed: 15
+    maxSpeed: 20
